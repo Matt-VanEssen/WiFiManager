@@ -264,7 +264,7 @@ const char D_HR[]                 PROGMEM = "--------------------";
 #ifdef ESP8266
     const char S_ssidpre[]        PROGMEM = "ESP";
 #elif defined(ESP32)
-    const char S_ssidpre[]        PROGMEM = "ESP32";
+    const char S_ssidpre[]        PROGMEM = "Test";
 #else
     const char S_ssidpre[]        PROGMEM = "WM";
 #endif
