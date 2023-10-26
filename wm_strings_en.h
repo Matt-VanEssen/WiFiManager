@@ -176,7 +176,7 @@ const char HTTP_JS[] PROGMEM =
 // Info html
 // @todo remove html elements from progmem, repetetive strings
 #ifdef ESP32
-	const char HTTP_INFO_esphead[]    PROGMEM = "<h3>esp32</h3><hr><dl>";
+	const char HTTP_INFO_esphead[]    PROGMEM = "<h3>Welcome to WiFi Setup</h3><hr><dl>";
 	const char HTTP_INFO_chiprev[]    PROGMEM = "<dt>Chip rev</dt><dd>{1}</dd>";
   	const char HTTP_INFO_lastreset[]  PROGMEM = "<dt>Last reset reason</dt><dd>CPU0: {1}<br/>CPU1: {2}</dd>";
   	const char HTTP_INFO_aphost[]     PROGMEM = "<dt>Access point hostname</dt><dd>{1}</dd>";
