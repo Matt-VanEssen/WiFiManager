@@ -895,6 +895,8 @@ uint8_t WiFiManager::processConfigPortal(){
             DEBUG_WM(F("Connect to new AP [SUCCESS]"));
             DEBUG_WM(F("Got IP Address:"));
             DEBUG_WM(WiFi.localIP());
+            DEBUG_WM(F("Restarting..."));
+            ESP.restart();
           }
           #endif
 
