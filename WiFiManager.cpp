@@ -281,6 +281,7 @@ boolean WiFiManager::autoConnect(char const *apName, char const *apPassword) {
   #endif
 
   // bool wifiIsSaved = getWiFiIsSaved();
+  bool wifiIsSaved = true; // workaround until I can check esp32 wifiisinit and has nvs
 
   #ifdef ESP32
   setupHostname(true);
@@ -300,7 +301,7 @@ boolean WiFiManager::autoConnect(char const *apName, char const *apPassword) {
 
   // check if wifi is saved, (has autoconnect) to speed up cp start
   // NOT wifi init safe
-  // if(wifiIsSaved){
+  if(wifiIsSaved){
      _startconn = millis();
     _begin();
 
@@ -367,12 +368,12 @@ boolean WiFiManager::autoConnect(char const *apName, char const *apPassword) {
     #ifdef WM_DEBUG_LEVEL
     DEBUG_WM(F("AutoConnect: FAILED for "),(String)((millis()-_startconn)) + " ms");
     #endif
-  // }
-  // else {
-    // #ifdef WM_DEBUG_LEVEL
-    // DEBUG_WM(F("No Credentials are Saved, skipping connect"));
-    // #endif
-  // } 
+  }
+  else {
+    #ifdef WM_DEBUG_LEVEL
+    DEBUG_WM(F("No Credentials are Saved, skipping connect"));
+    #endif
+  }
 
   // possibly skip the config portal
   if (!_enableConfigPortal) {
@@ -1816,6 +1817,13 @@ void WiFiManager::handleWifiSave() {
   _ssid = server->arg(F("s")).c_str();
   _pass = server->arg(F("p")).c_str();
 
+  if(_ssid == "" && _pass != ""){
+    _ssid = WiFi_SSID(true); // password change, placeholder ssid, @todo compare pass to old?, confirm ssid is clean
+    #ifdef WM_DEBUG_LEVEL
+    DEBUG_WM(WM_DEBUG_VERBOSE,F("Detected WiFi password change"));
+    #endif    
+  }
+
   #ifdef WM_DEBUG_LEVEL
   String requestinfo = "SERVER_REQUEST\n----------------\n";
   requestinfo += "URI: ";
@@ -2416,16 +2424,18 @@ void WiFiManager::handleNotFound() {
  * Return true in that case so the page handler do not try to handle the request again. 
  */
 boolean WiFiManager::captivePortal() {
-  #ifdef WM_DEBUG_LEVEL
-  DEBUG_WM(WM_DEBUG_MAX,"-> " + server->hostHeader());
-  #endif
   
-  if(!_enableCaptivePortal) return false; // skip redirections, @todo maybe allow redirection even when no cp ? might be useful
+  if(!_enableCaptivePortal || !configPortalActive) return false; // skip redirections if cp not enabled or not in ap mode
   
   String serverLoc =  toStringIp(server->client().localIP());
 
+  #ifdef WM_DEBUG_LEVEL
+  DEBUG_WM(WM_DEBUG_DEV,"-> " + server->hostHeader());
+  DEBUG_WM(WM_DEBUG_DEV,"serverLoc " + serverLoc);
+  #endif
+
   // fallback for ipv6 bug
-  if(serverLoc = "0.0.0.0"){
+  if(serverLoc == "0.0.0.0"){
     if ((WiFi.status()) != WL_CONNECTED)
       serverLoc = toStringIp(WiFi.softAPIP());
     else
@@ -2438,6 +2448,7 @@ boolean WiFiManager::captivePortal() {
   if (doredirect) {
     #ifdef WM_DEBUG_LEVEL
     DEBUG_WM(WM_DEBUG_VERBOSE,F("<- Request redirected to captive portal"));
+    DEBUG_WM(WM_DEBUG_DEV,"serverLoc " + serverLoc);
     #endif
     server->sendHeader(F("Location"), (String)F("http://") + serverLoc, true); // @HTTPHEAD send redirect
     server->send ( 302, FPSTR(HTTP_HEAD_CT2), ""); // Empty content inhibits Content-length header so we have to close the socket ourselves.
@@ -2491,6 +2502,11 @@ void WiFiManager::reportStatus(String &page){
       }
       else if(_lastconxresult == WL_CONNECT_FAILED){
         // connect failed
+        str.replace(FPSTR(T_c),"D");
+        str.replace(FPSTR(T_r),FPSTR(HTTP_STATUS_OFFFAIL));
+      }
+      else if(_lastconxresult == WL_CONNECTION_LOST){
+        // connect failed, MOST likely 4WAY_HANDSHAKE_TIMEOUT/incorrect password, state is ambiguous however
         str.replace(FPSTR(T_c),"D");
         str.replace(FPSTR(T_r),FPSTR(HTTP_STATUS_OFFFAIL));
       }
@@ -3423,7 +3439,7 @@ void WiFiManager::debugPlatformInfo(){
     #endif
   #elif defined(ESP32)
   #ifdef WM_DEBUG_LEVEL
-    DEBUG_WM(F("[SYS] WM version: "),      WM_VERSION_STR);
+    DEBUG_WM(F("[SYS] WM version: "), String((__FlashStringHelper *)WM_VERSION_STR) +" D:"+String(_debugLevel));
     DEBUG_WM(F("[SYS] Arduino version: "), VER_ARDUINO_STR);
     DEBUG_WM(F("[SYS] ESP SDK version: "), ESP.getSdkVersion());
     DEBUG_WM(F("[SYS] Free heap:       "), ESP.getFreeHeap());
@@ -3747,6 +3763,8 @@ String WiFiManager::WiFi_SSID(bool persistent) const{
     return String(reinterpret_cast<char*>(tmp));
     
     #elif defined(ESP32)
+    // bool res = WiFi.wifiLowLevelInit(true); // @todo fix for S3, not found
+    // wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     if(persistent){
       wifi_config_t conf;
       esp_wifi_get_config(WIFI_IF_STA, &conf);
@@ -3819,7 +3837,7 @@ String WiFiManager::WiFi_psk(bool persistent) const {
       #ifdef WM_DEBUG_LEVEL
       if(info.wifi_sta_disconnected.reason == WIFI_REASON_NO_AP_FOUND) DEBUG_WM(WM_DEBUG_VERBOSE,F("[EVENT] WIFI_REASON: NO_AP_FOUND"));
       if(info.wifi_sta_disconnected.reason == WIFI_REASON_ASSOC_FAIL){
-        if(_aggresiveReconn) _connectRetries+=4;
+        if(_aggresiveReconn && _connectRetries<4) _connectRetries=4;
         DEBUG_WM(WM_DEBUG_VERBOSE,F("[EVENT] WIFI_REASON: AUTH FAIL"));
       }  
       #endif
