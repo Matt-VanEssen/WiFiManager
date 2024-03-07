@@ -51,10 +51,10 @@
 // #warning ESP32S3
 // #endif
 
-#if defined(ARDUINO_ESP32S3_DEV) || defined(CONFIG_IDF_TARGET_ESP32S3)
-#warning "WM_NOTEMP"
-#define WM_NOTEMP // disabled temp sensor, have to determine which chip we are on
-#endif
+// #if defined(ARDUINO_ESP32S3_DEV) || defined(CONFIG_IDF_TARGET_ESP32S3)
+// #warning "WM_NOTEMP"
+// #define WM_NOTEMP // disabled temp sensor, have to determine which chip we are on
+// #endif
 
 // #include "soc/efuse_reg.h" // include to add efuse chip rev to info, getChipRevision() is almost always the same though, so not sure why it matters.
 
@@ -222,14 +222,13 @@ class WiFiManagerParameter {
   protected:
     void init(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement);
 
-  private:
     WiFiManagerParameter& operator=(const WiFiManagerParameter&);
     const char *_id;
     const char *_label;
     char       *_value;
     int         _length;
     int         _labelPlacement;
-  protected:
+  
     const char *_customHTML;
     friend class WiFiManager;
 };
@@ -509,7 +508,7 @@ class WiFiManager
     
     std::unique_ptr<WM_WebServer> server;
 
-  private:
+  protected:
     // vars
     std::vector<uint8_t> _menuIds;
     std::vector<const char *> _menuIdsParams  = {"wifi","param","info","exit"};
@@ -560,7 +559,7 @@ class WiFiManager
     uint16_t      _httpPort               = 80; // port for webserver
     // uint8_t       _retryCount             = 0; // counter for retries, probably not needed if synchronous
     uint8_t       _connectRetries         = 1; // number of sta connect retries, force reconnect, wait loop (connectimeout) does not always work and first disconnect bails
-    bool          _aggresiveReconn        = true; // use an agrressive reconnect strategy, WILL delay conxs
+    bool          _aggresiveReconn        = false; // use an agrressive reconnect strategy, WILL delay conxs
                                                    // on some conn failure modes will add delays and many retries to work around esp and ap bugs, ie, anti de-auth protections
                                                    // https://github.com/tzapu/WiFiManager/issues/1067
     bool          _allowExit              = true; // allow exit in nonblocking, else user exit/abort calls will be ignored including cptimeout
@@ -621,9 +620,12 @@ class WiFiManager
     // 
     // preload scanning causes AP to delay showing for users, but also caches and lets the cp load faster once its open
     //  my scan takes 7-10 seconds
-    boolean       _preloadwifiscan        = true; // preload wifiscan if true
+public:
+    boolean       _preloadwifiscan        = false; // preload wifiscan if true
     unsigned int  _scancachetime          = 30000; // ms cache time for preload scans
-    boolean       _asyncScan              = true; // perform wifi network scan async
+    boolean       _asyncScan              = false; // perform wifi network scan async
+    
+protected:
 
     boolean       _autoforcerescan        = false;  // automatically force rescan if scan networks is 0, ignoring cache
     
@@ -662,7 +664,7 @@ class WiFiManager
     // webserver handlers
 public:
     void          handleNotFound();
-private:
+protected:
     void          HTTPSend(const String &content);
     void          handleRoot();
     void          handleWifi(boolean scan);
@@ -764,8 +766,15 @@ private:
     boolean       abort               = false;
     boolean       reset               = false;
     boolean       configPortalActive  = false;
+
+
+    // these are state flags for portal mode, we are either in webportal mode(STA) or configportal mode(AP)
+    // these are mutually exclusive as STA+AP mode is not supported due to channel restrictions and stability
+    // if we decide to support this, these checks will need to be replaced with something client aware to check if client origin is ap or web
+    // These state checks are critical and used for internal function checks
     boolean       webPortalActive     = false;
     boolean       portalTimeoutResult = false;
+
     boolean       portalAbortResult   = false;
     boolean       storeSTAmode        = true; // option store persistent STA mode in connectwifi 
     int           timer               = 0;    // timer for debug throttle for numclients, and portal timeout messages

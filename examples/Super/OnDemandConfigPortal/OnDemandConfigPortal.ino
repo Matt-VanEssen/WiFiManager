@@ -79,16 +79,16 @@ void bindServerCallback(){
   // you can override wm route endpoints, I have not found a way to remove handlers, but this would let you disable them or add auth etc.
   // wm.server->on("/info",handleNotFound);
   // wm.server->on("/update",handleNotFound);
-  wm.server->on("/erase",handleNotFound);
+  wm.server->on("/erase",handleNotFound); // disable erase
 }
 
 void handleRoute(){
-  Serial.println("[HTTP] handle route");
+  Serial.println("[HTTP] handle custom route");
   wm.server->send(200, "text/plain", "hello from user code");
 }
 
 void handleNotFound(){
-  Serial.println("[HTTP] handle route");
+  Serial.println("[HTTP] override handle route");
   wm.handleNotFound();
 }
 
@@ -218,7 +218,7 @@ void setup() {
 */
 
   std::vector<const char *> menu = {"wifi","wifinoscan","info","param","custom","close","sep","erase","update","restart","exit"};
-  wm.setMenu(menu); // custom menu, pass vector
+  // wm.setMenu(menu); // custom menu, pass vector
   
   // wm.setParamsPage(true); // move params to seperate page, not wifi, do not combine with setmenu!
 
@@ -239,7 +239,7 @@ void setup() {
 
   // set Hostname
 
-  wm.setHostname(("WM_"+wm.getDefaultAPName()).c_str());
+  // wm.setHostname(("WM_"+wm.getDefaultAPName()).c_str());
   // wm.setHostname("WM_RANDO_1234");
 
   // set custom channel
@@ -258,9 +258,10 @@ void setup() {
     wm.setConfigPortalBlocking(false);
   }
 
+
   //sets timeout until configuration portal gets turned off
   //useful to make it all retry or go to sleep in seconds
-  wm.setConfigPortalTimeout(120);
+  wm.setConfigPortalTimeout(TESP_CP_TIMEOUT);
   
   // set min quality to show in web list, default 8%
   // wm.setMinimumSignalQuality(50);
@@ -327,7 +328,8 @@ void setup() {
 void wifiInfo(){
   // can contain gargbage on esp32 if wifi is not ready yet
   Serial.println("[WIFI] WIFI_INFO DEBUG");
-  // WiFi.printDiag(Serial);
+  WiFi.printDiag(Serial);
+  Serial.println("[WIFI] MODE: " + (String)(wm.getModeString(WiFi.getMode())));
   Serial.println("[WIFI] SAVED: " + (String)(wm.getWiFiIsSaved() ? "YES" : "NO"));
   Serial.println("[WIFI] SSID: " + (String)wm.getWiFiSSID());
   Serial.println("[WIFI] PASS: " + (String)wm.getWiFiPass());
@@ -340,13 +342,14 @@ void loop() {
     wm.process();
   }
 
+
   #ifdef USEOTA
   ArduinoOTA.handle();
   #endif
   // is configuration portal requested?
   if (ALLOWONDEMAND && digitalRead(ONDDEMANDPIN) == LOW ) {
     delay(100);
-    if ( digitalRead(ONDDEMANDPIN) == LOW ){
+    if ( digitalRead(ONDDEMANDPIN) == LOW || BUTTONFUNC == 2){
       Serial.println("BUTTON PRESSED");
 
       // button reset/reboot
@@ -363,11 +366,12 @@ void loop() {
           Serial.println("failed to connect and hit timeout");
           delay(3000);
         }
+        return;
       }
 
       //test autoconnect as reconnect etc.
       if(BUTTONFUNC == 2){
-        wm.setConfigPortalTimeout(20);
+        wm.setConfigPortalTimeout(TESP_CP_TIMEOUT);
         wm.autoConnect();
         return;
       }
